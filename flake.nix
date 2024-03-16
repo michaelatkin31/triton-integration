@@ -13,7 +13,10 @@
     let 
       pkgs = import nixpkgs {
         inherit system;
-        config.allowUnfree = true;
+        config = {
+          allowUnfree = true;
+          cudaSupport = true;
+        };
       };
     in 
       {
@@ -21,6 +24,7 @@
           buildInputs = (with pkgs; [
             python3
           ]) ++ (with pkgs.python3Packages; [
+            openai-triton-cuda
             numpy
             scipy
             torch
