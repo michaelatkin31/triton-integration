@@ -12,7 +12,8 @@
 
   # Nixpkgs / NixOS version to use.
   inputs = {
-    nixpkgs.url = "nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/a438c431ba249e81f2bdb3dedd6b79492d2b7238";
+    # nixpkgs.url = "nixpkgs/nixos-23.11";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
@@ -22,19 +23,31 @@
         inherit system;
         config = {
           allowUnfree = true;
-          cudaSupport = true;
+          # cudaSupport = true;
         };
       };
     in 
       {
+        # packages = {
+        #   openai-triton-cuda = pkgs.openai-triton-cuda.overrideAttrs ( old: rec {
+        #     version = "2.4.9";
+        #     src = pkgs.fetchFromGitHub {
+        #       owner = "doctest";
+        #       repo = "doctest";
+        #       rev = "v${version}";
+        #       sha256 = "sha256-ugmkeX2PN4xzxAZpWgswl4zd2u125Q/ADSKzqTfnd94=";
+        #     };
+        #     patches = [];
+        #   });
+        # }
         devShell = pkgs.mkShell {
           buildInputs = (with pkgs; [
             python3
           ]) ++ (with pkgs.python3Packages; [
             openai-triton-cuda
             numpy
-            scipy
-            torch
+            # scipy
+            pytorch-bin
           ]);
         };
       }
