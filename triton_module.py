@@ -289,8 +289,6 @@ def compile(dtype, BM, BN, BK, M, N, K):
     return tmp_dir
 
 def run(tmp_dir, a_path, b_path, c_path):
-    print("got here")
     env = os.environ.copy()
     env["LD_LIBRARY_PATH"] = tmp_dir
-    print("got there")
     subprocess.run(["./test", a_path, b_path, c_path], env=env, check=True, cwd=tmp_dir)
