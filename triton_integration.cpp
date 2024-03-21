@@ -114,30 +114,22 @@ void run_triton_kernel(const TritonHandler& handler, const std::string& filepath
 }
 
 // void run_triton_kernel(TritonHandler handler, const std::string& filepath1, const std::string& filepath2, const std::string& filepath3) {
-//     std::cout << "hola muchacho" << std::endl;
 //     // Initialize the Python Interpreter
 //     Py_Initialize();
-//     std::cout << "hola muchacho 2" << std::endl;
 //     // Define the Python script filename and function name
 //     const char *scriptFilename = "triton_module";
-//     std::cout << "hola muchacho 3" << std::endl;
 //     const char *functionName = "run";
 
-//     std::cout << "hola muchacho 4" << std::endl;
 //     PyObject *pName, *pModule, *pFunc;
-//     std::cout << "hola muchacho 5" << std::endl;
 //     PyObject *pArgs, *pValue;
-//     std::cout << "hola muchacho 6" << std::endl;
 
 //     // Convert the filename and function name to Python objects
 //     std::cout << "scriptFilename: " << scriptFilename << std::endl;
 //     pName = PyUnicode_DecodeFSDefault(scriptFilename);
-//     std::cout << "hola muchacho 7" << std::endl;
 
 
 //     // Import the module
 //     pModule = PyImport_Import(pName);
-//     std::cout << "hola muchacho 8" << std::endl;
 //     Py_DECREF(pName);
 
 //     std::cout << "hello" << std::endl;
