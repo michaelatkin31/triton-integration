@@ -275,180 +275,22 @@ def link_aot_kernels(dir):
     h_files = glob.glob(os.path.join(dir, "*.h"))
     subprocess.run([sys.executable, linker_path] + h_files + ["-o", "kernel"], check=True, cwd=dir)
 
+# Below are functions called by triton_integration.cpp
 
-def generate_matmul_test_data(dir, M, N, K):
-    a = np.random.randn(M * K).astype(np.float16).reshape((M, K))
-    b = np.random.randn(M * K).astype(np.float16).reshape((K, N))
-    a_path = os.path.join(dir, "a.csv")
-    b_path = os.path.join(dir, "b.csv")
-    c_path = os.path.join(dir, "c.csv")
-    for x, path in [(a, a_path), (b, b_path)]:
-        x.view(np.int16).ravel().tofile(path, sep=",")
-    return a, b, a_path, b_path, c_path
+def compile(dtype, BM, BN, BK, M, N, K):
+    tmp_dir = tempfile.mkdtemp()
+    kernel_path = write_triton_kernels(tmp_dir, kernel_src, kernel_utils_src)
+    compile_aot_kernels(tmp_dir, kernel_path, dtype, BM, BN, BK, ha_hb_hints=["", ":16"])
+    link_aot_kernels(tmp_dir)
 
+    # compile test case
+    gen_kernel_library(tmp_dir, "libkernel.so")
+    gen_test_bin(tmp_dir, M, N, K)
+    return tmp_dir
 
-# Test edge case where the provided kernel signature has no specializations
-def test_compile_link_matmul_no_specialization():
-    np.random.seed(3)
-
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        dtype = "fp16"
-        BM, BN, BK = 16, 16, 16
-
-        kernel_path = write_triton_kernels(tmp_dir, kernel_src, kernel_utils_src)
-        compile_aot_kernel_no_specialization(tmp_dir, kernel_path, dtype, BM, BN, BK)
-        link_aot_kernels(tmp_dir)
-
-        # compile test case
-        M, N, K = 16, 16, 16
-        gen_kernel_library(tmp_dir, "libkernel.so")
-        gen_test_bin(tmp_dir, M, N, K)
-
-        # initialize test data
-        a, b, a_path, b_path, c_path = generate_matmul_test_data(tmp_dir, M, N, K)
-
-        # run test case
-        env = os.environ.copy()
-        env["LD_LIBRARY_PATH"] = tmp_dir
-        subprocess.run(["./test", a_path, b_path, c_path], env=env, check=True, cwd=tmp_dir)
-
-        # read data and compare against reference
-        c = np.genfromtxt(c_path, delimiter=",", dtype=np.int32)
-        c_tri = c.reshape((M, N)).view(np.float32)
-        c_ref = np.matmul(a.astype(np.float32), b.astype(np.float32))
-        np.testing.assert_allclose(c_tri, c_ref * c_ref, atol=1e-4, rtol=0.0)
-
-
-def test_compile_link_matmul():
-    np.random.seed(3)
-
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        dtype = "fp16"
-        BM, BN, BK = 16, 16, 16
-
-        kernel_path = write_triton_kernels(tmp_dir, kernel_src, kernel_utils_src)
-        compile_aot_kernels(tmp_dir, kernel_path, dtype, BM, BN, BK, ha_hb_hints=["", ":16"])
-        link_aot_kernels(tmp_dir)
-
-        # compile test case
-        M, N, K = 16, 16, 16
-        gen_kernel_library(tmp_dir, "libkernel.so")
-        gen_test_bin(tmp_dir, M, N, K)
-
-        # initialize test data
-        a, b, a_path, b_path, c_path = generate_matmul_test_data(tmp_dir, M, N, K)
-
-        # run test case
-        env = os.environ.copy()
-        env["LD_LIBRARY_PATH"] = tmp_dir
-        subprocess.run(["./test", a_path, b_path, c_path], env=env, check=True, cwd=tmp_dir)
-
-        # read data and compare against reference
-        c = np.genfromtxt(c_path, delimiter=",", dtype=np.int32)
-        c_tri = c.reshape((M, N)).view(np.float32)
-        c_ref = np.matmul(a.astype(np.float32), b.astype(np.float32))
-        np.testing.assert_allclose(c_tri, c_ref * c_ref, atol=1e-4, rtol=0.0)
-
-
-def test_launcher_has_no_available_kernel():
-    np.random.seed(3)
-
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        dtype = "fp16"
-        BM, BN, BK = 16, 16, 16
-
-        kernel_path = write_triton_kernels(tmp_dir, kernel_src, kernel_utils_src)
-        compile_aot_kernels(tmp_dir, kernel_path, dtype, BM, BN, BK, ha_hb_hints=[":1"])
-        link_aot_kernels(tmp_dir)
-
-        # compile test case
-        M, N, K = 16, 16, 16
-        gen_kernel_library(tmp_dir, "libkernel.so")
-        gen_test_bin(tmp_dir, M, N, K)
-
-        # initialize test data
-        a, b, a_path, b_path, c_path = generate_matmul_test_data(tmp_dir, M, N, K)
-
-        # run test case
-        env = os.environ.copy()
-        env["LD_LIBRARY_PATH"] = tmp_dir
-        result = subprocess.run(
-            ["./test", a_path, b_path, c_path],
-            env=env,
-            cwd=tmp_dir,
-            capture_output=True,
-            text=True,
-        )
-
-        # It should fail since the launcher requires all the strides be 1 while they are not.
-        assert result.returncode == -6
-        assert "kernel launch failed" in result.stderr
-
-
-def test_compile_link_autotune_matmul():
-    np.random.seed(3)
-
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        dtype = "fp16"
-
-        kernel_path = write_triton_kernels(tmp_dir, kernel_src, kernel_utils_src)
-
-        tile_sizes = [
-            [16, 16, 16],
-            [32, 32, 16],
-            [32, 32, 32],
-            [64, 64, 32],
-        ]
-
-        for ts in tile_sizes:
-            BM, BN, BK = ts[0], ts[1], ts[2]
-            compile_aot_kernels(tmp_dir, kernel_path, dtype, BM, BN, BK, ha_hb_hints=["", ":16"])
-
-        link_aot_kernels(tmp_dir)
-
-        gen_kernel_library(tmp_dir, "libkernel.so")
-
-        # compile test case
-        M, N, K = 64, 64, 64
-        # initialize test data
-        a, b, a_path, b_path, c_path = generate_matmul_test_data(tmp_dir, M, N, K)
-        c_ref = np.matmul(a.astype(np.float32), b.astype(np.float32))
-
-        for algo_id in range(len(tile_sizes)):
-            # generate and run test case
-            test_name = f"test_{algo_id}"
-            gen_test_bin(tmp_dir, M, N, K, exe=test_name, algo_id=algo_id)
-
-            env = os.environ.copy()
-            env["LD_LIBRARY_PATH"] = tmp_dir
-            subprocess.run(
-                [f"./{test_name}", a_path, b_path, c_path],
-                check=True,
-                cwd=tmp_dir,
-                env=env,
-            )
-
-            # read data and compare against reference
-            c = np.genfromtxt(c_path, delimiter=",", dtype=np.int32)
-            c_tri = c.reshape((M, N)).view(np.float32)
-            np.testing.assert_allclose(c_tri, c_ref * c_ref, atol=1e-4, rtol=1e-4)
-
-
-def test_ttgir_to_ptx():
-    src = """
-module attributes {"triton_gpu.num-warps" = 4 : i32, "triton_gpu.threads-per-warp" = 32 : i32, "triton_gpu.num-ctas" = 1 : i32} {
-  tt.func public @sum_kernel_0d1d(%arg0: !tt.ptr<i32, 1>, %arg1: !tt.ptr<i32, 1>) {
-    tt.return
-  }
-}
-"""
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        kernel_path = os.path.join(tmp_dir, "empty_kernel.ttgir")
-        with open(kernel_path, "w") as fp:
-            fp.write(src)
-        k = triton.compile(kernel_path, cc=80)
-        ptx = k.asm["ptx"]
-        assert ".target sm_80" in ptx
-        assert ".address_size 64" in ptx
-
-test_compile_link_matmul()
+def run(tmp_dir, a_path, b_path, c_path):
+    print("got here")
+    env = os.environ.copy()
+    env["LD_LIBRARY_PATH"] = tmp_dir
+    print("got there")
+    subprocess.run(["./test", a_path, b_path, c_path], env=env, check=True, cwd=tmp_dir)
