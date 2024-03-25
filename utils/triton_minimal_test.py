@@ -1,4 +1,6 @@
 """
+Minimal example of using Triton. From https://triton-lang.org/main/getting-started/tutorials/01-vector-add.html#sphx-glr-getting-started-tutorials-01-vector-add-py
+
 Vector Addition
 ===============
 

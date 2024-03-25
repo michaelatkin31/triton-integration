@@ -5,12 +5,12 @@
  *   This file contains a C++ API for compiling and executing Triton kernels.
  *
  * Instructions:
- * 1. Initialize a conda env. Install all dependencies such that test_aot.py runs to completion.
+ * 1. Initialize a conda env. Install all dependencies such that utils/test_aot.py runs to completion.
  * 2. export LD_LIBRARY_PATH=/opt/conda/envs/NAME_OF_ENVIRONMENT/lib:$LD_LIBRARY_PATH
  * 3. export PYTHONPATH="/path/to/the/directory/containing/triton_module.py:$PYTHONPATH"
  * 
  * Compile:
- * g++ triton_integration.cpp -o triton_integration -I/opt/conda/envs/triton/include/python3.12 -L/opt/conda/envs/triton/lib -lpython3.12 -lpthread
+ * g++ -std=c++17 triton_integration.cpp -o triton_integration -I/opt/conda/envs/triton/include/python3.12 -L/opt/conda/envs/triton/lib -lpython3.12 -lpthread
  *
  * Run:
  * ./triton_integration
