@@ -1,3 +1,7 @@
+"""
+Generates random data for matrix multiplication.
+"""
+
 import os
 import numpy as np
 
